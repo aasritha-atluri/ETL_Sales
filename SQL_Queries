@@ -1,0 +1,166 @@
+/* ============================================================
+   SALES ETL PROJECT (TASK 1, 2, 8)
+   Description:
+   - Task 1: Data Cleaning & Transformation
+   - Task 2: Rejected Records Handling
+   - Task 8: High Value Transactions
+   ============================================================ */
+
+
+/* ============================================================
+   STEP 1: CREATE DATABASE
+   ============================================================ */
+
+CREATE DATABASE IF NOT EXISTS sales_etl;
+USE sales_etl;
+
+
+/* ============================================================
+   STEP 2: CREATE MASTER TABLES
+   ============================================================ */
+
+CREATE TABLE product_master (
+    product_id VARCHAR(20),
+    product_name VARCHAR(100),
+    category VARCHAR(50),
+    brand VARCHAR(50),
+    unit_price DECIMAL(10,2),
+    cost_price DECIMAL(10,2)
+);
+
+CREATE TABLE store_master (
+    store_id INT,
+    store_name VARCHAR(100),
+    city VARCHAR(50),
+    state VARCHAR(50)
+);
+
+
+/* ============================================================
+   STEP 3: CREATE SOURCE TABLE
+   ============================================================ */
+
+CREATE TABLE sales_transactions_dirty (
+    transaction_id INT,
+    store_id INT,
+    transaction_date VARCHAR(20),
+    product_id VARCHAR(20),
+    quantity INT,
+    discount_percent DECIMAL(5,2)
+);
+
+
+/* ============================================================
+   STEP 4: CREATE REJECTED TABLE (TASK 2)
+   ============================================================ */
+
+CREATE TABLE rejected_sales (
+    transaction_id INT,
+    store_id INT,
+    transaction_date VARCHAR(20),
+    product_id VARCHAR(20),
+    quantity INT,
+    discount_percent DECIMAL(5,2),
+    rejection_reason VARCHAR(255)
+);
+
+
+/* ============================================================
+   STEP 5: INSERT REJECTED RECORDS
+   ============================================================ */
+
+INSERT INTO rejected_sales
+SELECT 
+    t.*,
+    CASE
+        WHEN product_id IS NULL THEN 'Missing Product ID'
+        WHEN store_id IS NULL THEN 'Missing Store ID'
+        WHEN quantity = 0 THEN 'Zero Quantity'
+        WHEN discount_percent > 100 THEN 'Invalid Discount > 100'
+        WHEN STR_TO_DATE(transaction_date, '%m/%d/%Y') IS NULL THEN 'Invalid Date'
+        ELSE 'Other Issue'
+    END AS rejection_reason
+FROM sales_transactions_dirty t
+WHERE 
+    product_id IS NULL
+    OR store_id IS NULL
+    OR quantity = 0
+    OR discount_percent > 100
+    OR STR_TO_DATE(transaction_date, '%m/%d/%Y') IS NULL;
+
+
+/* ============================================================
+   STEP 6: CREATE CLEANED SALES TABLE (TASK 1)
+   ============================================================ */
+
+CREATE TABLE cleaned_sales AS
+SELECT 
+    t.transaction_id,
+
+    -- Convert Date
+    STR_TO_DATE(t.transaction_date, '%m/%d/%Y') AS transaction_date,
+
+    -- Store Info
+    CAST(t.store_id AS SIGNED) AS store_id,
+    s.store_name,
+    s.city,
+    s.state,
+
+    -- Product Info
+    TRIM(LOWER(t.product_id)) AS product_id,
+    p.product_name,
+    p.category,
+    p.brand,
+
+    -- Clean Data
+    ABS(t.quantity) AS quantity,
+    p.unit_price,
+    ABS(t.discount_percent) AS discount_percent,
+
+    -- KPI Calculations
+    (p.unit_price * ABS(t.quantity)) AS gross_amount,
+    (p.unit_price * ABS(t.quantity)) * (ABS(t.discount_percent)/100) AS discount_value,
+    (p.unit_price * ABS(t.quantity)) -
+    ((p.unit_price * ABS(t.quantity)) * (ABS(t.discount_percent)/100)) AS net_revenue
+
+FROM sales_transactions_dirty t
+
+JOIN product_master p 
+    ON TRIM(LOWER(t.product_id)) = TRIM(LOWER(p.product_id))
+
+JOIN store_master s 
+    ON CAST(t.store_id AS SIGNED) = s.store_id
+
+WHERE 
+    t.product_id IS NOT NULL
+    AND t.store_id IS NOT NULL
+    AND t.quantity IS NOT NULL
+    AND t.quantity != 0
+    AND t.discount_percent <= 100
+    AND STR_TO_DATE(t.transaction_date, '%m/%d/%Y') IS NOT NULL;
+
+
+/* ============================================================
+   STEP 7: VIEW CLEAN DATA
+   ============================================================ */
+
+SELECT * FROM cleaned_sales;
+
+
+/* ============================================================
+   STEP 8: HIGH VALUE TRANSACTIONS (TASK 8)
+   ============================================================ */
+
+SELECT 
+    transaction_id,
+    transaction_date,
+    store_name,
+    product_name,
+    net_revenue,
+    'HIGH VALUE' AS flag
+FROM cleaned_sales c
+WHERE net_revenue > (
+    SELECT AVG(net_revenue)
+    FROM cleaned_sales
+    WHERE MONTH(transaction_date) = MONTH(c.transaction_date)
+);
