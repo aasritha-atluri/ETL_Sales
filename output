@@ -1,1 +1,85 @@
+# Output Results – Sales ETL Project
+
+## Overview
+This section contains the output results generated after executing the ETL pipeline using Informatica Intelligent Cloud Services (IICS).
+
+The pipeline includes:
+- Data cleaning and validation
+- Separation of valid and rejected records
+- Data enrichment using master tables
+- KPI calculations (Gross Amount, Discount, Net Revenue)
+
+---
+
+## Task 1: Cleaned Sales Data
+
+After applying data cleaning rules:
+- Negative quantities were converted to positive
+- Invalid dates were corrected
+- Null values were removed
+- Discount values were validated
+
+### Output:
+Cleaned data is stored in:
+**STG_SALES_CLEAN**
+
+---
+
+## Task 2: Rejected Records
+
+Records that failed validation were separated into a rejection table.
+
+### Rejection Conditions:
+- Missing PRODUCT_ID
+- Missing STORE_ID
+- Quantity = 0
+- Discount > 100%
+- Invalid date format
+
+### Output:
+Rejected records stored in:
+**TGT_REJECTED_SALES**
+
+---
+
+## Task 8: High Value Transactions
+
+High-value transactions were identified based on:
+- NET_REVENUE greater than average revenue of that month
+
+### Output:
+- Transactions flagged as **HIGH VALUE**
+
+---
+
+## KPI Calculations
+
+The following KPIs were computed:
+
+- **GROSS_AMOUNT** = UNIT_PRICE × QUANTITY  
+- **DISCOUNT_VALUE** = GROSS_AMOUNT × (DISCOUNT_PERCENT / 100)  
+- **NET_REVENUE** = GROSS_AMOUNT - DISCOUNT_VALUE  
+
+---
+
+## Screenshots
+
+Below are the output screenshots from IICS:
+
+- Cleaned data output  
+- Rejected records  
+- KPI calculations  
+- Final results  
+
+(Refer to images in this folder)
+
+---
+
+## Conclusion
+
+The ETL pipeline successfully:
+- Cleaned and validated raw data  
+- Ensured data quality  
+- Generated meaningful business insights  
+- Prepared data for reporting and analytics  
 
